@@ -1,155 +1,93 @@
-import subprocess
-import os
-import sys
-import json
-import signal
-import psutil
-from pathlib import Path
+#!/bin/bash
 
-CONFIG_FILE = Path.home() / '.pypm_config.json'
-STARTUP_SCRIPT = Path.home() / '.pypm_startup.sh'
+# PyPM Installation Script
 
-def load_config():
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
-    return {}
+# Check if script is run as root
+if [ "$EUID" -ne 0 ]; then 
+  echo "Please run as root"
+  exit
+fi
 
-def save_config(config):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(config, f, indent=2)
+# Prompt for the username
+read -p "Enter the username to install PyPM for: " USERNAME
 
-def list_processes(config):
-    for name, process in config.items():
-        if psutil.pid_exists(process['pid']):
-            p = psutil.Process(process['pid'])
-            status = "RUNNING" if p.is_running() else "STOPPED"
-            cpu = p.cpu_percent()
-            memory = p.memory_info().rss / 1024 / 1024  # Convert to MB
-            print(f"{name:<20} {status:<10} PID: {process['pid']:<6} CPU: {cpu:.1f}% MEM: {memory:.1f}MB")
-        else:
-            print(f"{name:<20} STOPPED    PID: N/A")
+# Check if user exists
+if ! id "$USERNAME" &>/dev/null; then
+    echo "User $USERNAME does not exist. Please create the user first."
+    exit 1
+fi
 
-def find_venv(directory):
-    venv_dirs = ['venv', '.venv', 'env', '.env', '.']
-    for venv in venv_dirs:
-        venv_path = Path(directory) / venv
-        if (venv_path / 'bin' / 'activate').exists():
-            return venv_path
-        # Check if we're already in a venv
-        elif (venv_path / 'activate').exists():
-            return venv_path.parent
-    
-    # Check parent directory as well
-    parent_dir = Path(directory).parent
-    for venv in venv_dirs:
-        venv_path = parent_dir / venv
-        if (venv_path / 'bin' / 'activate').exists():
-            return venv_path
-    
-    return None
+# Install system dependencies
+apt update
+apt install -y python3-pip python3-venv
 
-def start_process(name, directory, command):
-    venv_path = find_venv(directory)
-    if venv_path:
-        activate_venv = f"source {venv_path}/bin/activate"
-        full_command = f"cd {directory} && {activate_venv} && {command}"
-    else:
-        full_command = f"cd {directory} && {command}"
-    
-    process = subprocess.Popen(full_command, shell=True, executable='/bin/bash', start_new_session=True)
-    return process.pid
+# Create directory for PyPM
+USER_HOME="/home/$USERNAME"
+PYPM_DIR="$USER_HOME/.pypm"
+LOCAL_BIN_DIR="$USER_HOME/.local/bin"
+mkdir -p "$PYPM_DIR"
+mkdir -p "$LOCAL_BIN_DIR"
 
-def stop_process(pid):
-    if pid and psutil.pid_exists(pid):
-        os.killpg(os.getpgid(pid), signal.SIGTERM)
+# Create virtual environment
+python3 -m venv "$PYPM_DIR/venv"
 
-def create_startup_script(config):
-    with open(STARTUP_SCRIPT, 'w') as f:
-        f.write("#!/bin/bash\n")
-        for name, process in config.items():
-            if process.get('autostart', False):
-                venv_path = find_venv(process['directory'])
-                if venv_path:
-                    f.write(f"cd {process['directory']} && source {venv_path}/bin/activate && {process['command']} &\n")
-                else:
-                    f.write(f"cd {process['directory']} && {process['command']} &\n")
-    os.chmod(STARTUP_SCRIPT, 0o755)
+# Activate virtual environment and install psutil
+su - $USERNAME << EOF
+source $PYPM_DIR/venv/bin/activate
+pip install psutil
+EOF
 
-def setup_autostart():
-    cron_command = f"@reboot {STARTUP_SCRIPT}"
-    subprocess.run(f"(crontab -l 2>/dev/null; echo \"{cron_command}\") | crontab -", shell=True)
+# Download PyPM script
+wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/pypm.py -O "$PYPM_DIR/pypm.py"
+chmod +x "$PYPM_DIR/pypm.py"
 
-def main():
-    config = load_config()
+# Create wrapper script
+cat > "$LOCAL_BIN_DIR/pypm" << EOF
+#!/bin/bash
+source $PYPM_DIR/venv/bin/activate
+python $PYPM_DIR/pypm.py "\$@"
+EOF
 
-    if len(sys.argv) < 2:
-        print("Usage: python process_manager.py [list|start|stop|restart|delete|save|startup]")
-        return
+chmod +x "$LOCAL_BIN_DIR/pypm"
 
-    action = sys.argv[1]
+# Add to PATH if not already there
+if ! grep -q "$LOCAL_BIN_DIR" "$USER_HOME/.bashrc"; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$USER_HOME/.bashrc"
+fi
 
-    if action == 'list':
-        list_processes(config)
-    elif action == 'start':
-        if len(sys.argv) < 3:
-            print("Usage: python process_manager.py start <name> [command]")
-            return
-        name = sys.argv[2]
-        if name in config:
-            directory = config[name]['directory']
-            command = config[name]['command']
-        else:
-            directory = os.getcwd()
-            command = ' '.join(sys.argv[3:])
-        pid = start_process(name, directory, command)
-        config[name] = {'command': command, 'pid': pid, 'directory': directory}
-        save_config(config)
-        print(f"Started {name} with PID {pid}")
-    elif action in ['stop', 'restart', 'delete']:
-        if len(sys.argv) < 3:
-            print(f"Usage: python process_manager.py {action} <name|all>")
-            return
-        target = sys.argv[2]
-        if target == 'all':
-            for name in list(config.keys()):
-                stop_process(config[name]['pid'])
-                if action == 'restart':
-                    pid = start_process(name, config[name]['directory'], config[name]['command'])
-                    config[name]['pid'] = pid
-                    print(f"Restarted {name} with PID {pid}")
-                elif action == 'delete':
-                    del config[name]
-                    print(f"Deleted {name}")
-                else:
-                    config[name]['pid'] = None
-                    print(f"Stopped {name}")
-        elif target in config:
-            stop_process(config[target]['pid'])
-            if action == 'restart':
-                pid = start_process(target, config[target]['directory'], config[target]['command'])
-                config[target]['pid'] = pid
-                print(f"Restarted {target} with PID {pid}")
-            elif action == 'delete':
-                del config[target]
-                print(f"Deleted {target}")
-            else:
-                config[target]['pid'] = None
-                print(f"Stopped {target}")
-        else:
-            print(f"Process {target} not found")
-        save_config(config)
-    elif action == 'save':
-        for name, process in config.items():
-            process['autostart'] = True
-        save_config(config)
-        create_startup_script(config)
-        print("Saved current process list for autostart")
-    elif action == 'startup':
-        setup_autostart()
-        print("Set up autostart on system boot")
-    else:
-        print("Unknown action. Use list, start, stop, restart, delete, save, or startup.")
+# Set correct ownership
+chown -R $USERNAME:$USERNAME "$PYPM_DIR"
+chown -R $USERNAME:$USERNAME "$LOCAL_BIN_DIR"
 
-if __name__ == "__main__":
-    main()
+echo "PyPM has been installed for user $USERNAME."
+echo "Please ask $USERNAME to log out and log back in, or run 'source ~/.bashrc' to update their PATH."
+echo "They can then use PyPM by simply typing 'pypm' followed by commands."
+
+# Usage guide
+cat << EOF
+
+Usage Guide for PyPM:
+
+1. Start a new process:
+   pypm start myapp "python3 app.py"
+
+2. List all processes:
+   pypm list
+
+3. Stop a process:
+   pypm stop myapp
+
+4. Restart a process:
+   pypm restart myapp
+
+5. Delete a process from PyPM:
+   pypm delete myapp
+
+6. Save current processes for autostart:
+   pypm save
+
+7. Set up autostart on system boot:
+   pypm startup
+
+For more information, run 'pypm' without any arguments.
+EOF
