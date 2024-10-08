@@ -4,7 +4,7 @@
 
 1. Download the installation script:
    ```
-   wget https://raw.githubusercontent.com/yourusername/pypm/main/install_pypm.sh
+   wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/install_pypm.sh
    ```
 
 2. Make the script executable:
