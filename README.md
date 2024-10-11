@@ -19,7 +19,7 @@
 
 4. When prompted, enter the username for which you want to install PyPM.
 
-5. The script will install all necessary dependencies and set up PyPM for the specified user.
+5. The script will install all necessary dependencies, set up PyPM for the specified user, and enable PyPM to start automatically on system boot.
 
 ## Usage
 
@@ -56,10 +56,35 @@ After installation, the specified user can use PyPM with the following commands:
    pypm save
    ```
 
-7. Set up autostart on system boot:
+7. Set up autostart for managed processes on system boot:
    ```
    pypm startup
    ```
+
+8. Disable autostart for managed processes:
+   ```
+   pypm disable-startup
+   ```
+
+9. Stop PyPM itself:
+   ```
+   pypm stop-self
+   ```
+
+10. Restart PyPM:
+    ```
+    pypm restart-self
+    ```
+
+11. Enable PyPM autostart (already done during installation):
+    ```
+    pypm enable
+    ```
+
+12. Disable PyPM autostart:
+    ```
+    pypm disable
+    ```
 
 ## Managing Multiple Processes
 
@@ -75,14 +100,15 @@ pypm start app2 "python3 app2.py"
 pypm list  # View all running processes
 
 pypm save  # Save current processes for autostart
-pypm startup  # Set up autostart on system boot
+pypm startup  # Set up autostart for managed processes on system boot
 ```
 
 ## Notes
 
 - PyPM automatically detects and uses virtual environments if they exist in your project directory.
 - Processes started with PyPM run in the background, allowing you to continue using your terminal.
-- The `pypm save` and `pypm startup` commands ensure your processes start automatically after system reboot.
+- The `pypm save` and `pypm startup` commands ensure your managed processes start automatically after system reboot.
+- PyPM itself is set to start automatically on system boot after installation. You can disable this with `pypm disable`.
 - PyPM doesn't need to run continuously to manage processes, making it resource-efficient.
 
 ## Transitioning from systemd
@@ -104,3 +130,7 @@ If you encounter any issues:
 1. Ensure the user has the necessary permissions to run the processes.
 2. Check the project directory for a virtual environment if your Python app requires specific dependencies.
 3. Verify that all required Python packages are installed in the project's virtual environment.
+4. If PyPM isn't starting automatically on boot, check its status with `pypm enable` and re-enable if necessary.
+5. For issues with managed processes not starting, check the autostart configuration with `pypm startup`.
+
+For any persistent problems or feature requests, please open an issue on the GitHub repository.
