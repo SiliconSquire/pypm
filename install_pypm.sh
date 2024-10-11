@@ -34,7 +34,7 @@ python3 -m venv "$PYPM_DIR/venv"
 # Activate virtual environment and install psutil
 su - $USERNAME << EOF
 source $PYPM_DIR/venv/bin/activate
-pip install psutil
+pip install psutil tabulate colorama
 EOF
 
 # Download PyPM script
