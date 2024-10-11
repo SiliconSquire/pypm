@@ -16,7 +16,7 @@ PYPM_AUTOSTART_MARKER = "# PyPM self-start entry"
 
 def enable_pypm_autostart():
     pypm_command = f"{sys.executable} {os.path.abspath(__file__)} start-self"
-    cron_entry = f"{PYPM_AUTOSTART_MARKER}\n@reboot {pypm_command}"
+    cron_entry = f"{PYPM_AUTOSTART_MARKER}\n@reboot nohup {pypm_command} >/dev/null 2>&1 &"
     
     current_crontab = subprocess.run("crontab -l", shell=True, capture_output=True, text=True).stdout
     if PYPM_AUTOSTART_MARKER not in current_crontab:
@@ -28,12 +28,10 @@ def enable_pypm_autostart():
 
 
 def disable_pypm_autostart():
-    current_crontab = subprocess.run("crontab -l", shell=True, capture_output=True, text=True).stdout
-    new_crontab = "\n".join([line for line in current_crontab.split("\n") 
-                             if PYPM_AUTOSTART_MARKER not in line])
-    subprocess.run(f"echo '{new_crontab}' | crontab -", shell=True)
+    current_crontab = subprocess.run("crontab -l", shell=True, capture_output=True, text=True).stdout.splitlines()
+    new_crontab = [line for line in current_crontab if PYPM_AUTOSTART_MARKER not in line]
+    subprocess.run("crontab -", input="\n".join(new_crontab), shell=True, text=True)
     print("PyPM autostart disabled")
-
 
 def load_config():
     if CONFIG_FILE.exists():
@@ -165,11 +163,10 @@ def restart_self():
 def start_self():
     pypm_path = Path(sys.executable).parent / 'pypm'
     if pypm_path.exists():
-        subprocess.Popen([str(pypm_path)], start_new_session=True)
+        subprocess.Popen(f"nohup {pypm_path} >/dev/null 2>&1 &", shell=True, start_new_session=True)
         print("PyPM has been started.")
     else:
         print("PyPM executable not found. Please ensure it's installed correctly.")
-
 
 def main():
     save_pid()  # Save the PID when PyPM starts
