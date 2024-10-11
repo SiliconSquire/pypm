@@ -1,5 +1,5 @@
 # PyPM (Python Process Manager BETA) Installation and Usage Guide
-
+REQUIREMENT: Debian based system (Tested on Debian 12.x)
 ## Installation
 
 1. Download the installation script:
