@@ -59,7 +59,10 @@ fi
 chown -R $USERNAME:$USERNAME "$PYPM_DIR"
 chown -R $USERNAME:$USERNAME "$LOCAL_BIN_DIR"
 
-echo "PyPM has been installed for user $USERNAME."
+# Enable PyPM autostart
+su - $USERNAME -c "$LOCAL_BIN_DIR/pypm enable"
+
+echo "PyPM has been installed for user $USERNAME and enabled for autostart."
 echo "Please ask $USERNAME to log out and log back in, or run 'source ~/.bashrc' to update their PATH."
 echo "They can then use PyPM by simply typing 'pypm' followed by commands."
 
@@ -86,8 +89,23 @@ Usage Guide for PyPM:
 6. Save current processes for autostart:
    pypm save
 
-7. Set up autostart on system boot:
+7. Set up autostart for managed processes:
    pypm startup
+
+8. Disable autostart for managed processes:
+   pypm disable-startup
+
+9. Stop PyPM itself:
+   pypm stop-self
+
+10. Restart PyPM:
+    pypm restart-self
+
+11. Enable PyPM autostart (already done during installation):
+    pypm enable
+
+12. Disable PyPM autostart:
+    pypm disable
 
 For more information, run 'pypm' without any arguments.
 EOF
