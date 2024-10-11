@@ -9,6 +9,31 @@ from pathlib import Path
 
 CONFIG_FILE = Path.home() / '.pypm_config.json'
 STARTUP_SCRIPT = Path.home() / '.pypm_startup.sh'
+CRON_MARKER = "# PyPM autostart entry"
+PYPM_PID_FILE = Path.home() / '.pypm_pid'
+PYPM_AUTOSTART_MARKER = "# PyPM self-start entry"
+
+
+def enable_pypm_autostart():
+    pypm_command = f"{sys.executable} {os.path.abspath(__file__)} start-self"
+    cron_entry = f"{PYPM_AUTOSTART_MARKER}\n@reboot {pypm_command}"
+    
+    current_crontab = subprocess.run("crontab -l", shell=True, capture_output=True, text=True).stdout
+    if PYPM_AUTOSTART_MARKER not in current_crontab:
+        new_crontab = current_crontab.strip() + f"\n{cron_entry}\n"
+        subprocess.run(f"echo '{new_crontab}' | crontab -", shell=True)
+        print("PyPM autostart enabled")
+    else:
+        print("PyPM autostart is already enabled")
+
+
+def disable_pypm_autostart():
+    current_crontab = subprocess.run("crontab -l", shell=True, capture_output=True, text=True).stdout
+    new_crontab = "\n".join([line for line in current_crontab.split("\n") 
+                             if PYPM_AUTOSTART_MARKER not in line])
+    subprocess.run(f"echo '{new_crontab}' | crontab -", shell=True)
+    print("PyPM autostart disabled")
+
 
 def load_config():
     if CONFIG_FILE.exists():
@@ -16,9 +41,11 @@ def load_config():
             return json.load(f)
     return {}
 
+
 def save_config(config):
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=2)
+
 
 def list_processes(config):
     for name, process in config.items():
@@ -30,6 +57,7 @@ def list_processes(config):
             print(f"{name:<20} {status:<10} PID: {process['pid']:<6} CPU: {cpu:.1f}% MEM: {memory:.1f}MB")
         else:
             print(f"{name:<20} STOPPED    PID: N/A")
+
 
 def find_venv(directory):
     venv_dirs = ['venv', '.venv', 'env', '.env', '.']
@@ -50,6 +78,7 @@ def find_venv(directory):
     
     return None
 
+
 def start_process(name, directory, command):
     venv_path = find_venv(directory)
     if venv_path:
@@ -62,9 +91,11 @@ def start_process(name, directory, command):
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return process.pid
 
+
 def stop_process(pid):
     if pid and psutil.pid_exists(pid):
         os.killpg(os.getpgid(pid), signal.SIGTERM)
+
 
 def create_startup_script(config):
     with open(STARTUP_SCRIPT, 'w') as f:
@@ -78,15 +109,74 @@ def create_startup_script(config):
                     f.write(f"cd {process['directory']} && {process['command']} &\n")
     os.chmod(STARTUP_SCRIPT, 0o755)
 
+
 def setup_autostart():
-    cron_command = f"@reboot {STARTUP_SCRIPT}"
-    subprocess.run(f"(crontab -l 2>/dev/null; echo \"{cron_command}\") | crontab -", shell=True)
+    cron_command = f"{CRON_MARKER}\n@reboot {STARTUP_SCRIPT}"
+    current_crontab = subprocess.run("crontab -l", shell=True, capture_output=True, text=True).stdout
+    if CRON_MARKER not in current_crontab:
+        new_crontab = current_crontab.strip() + f"\n{cron_command}\n"
+        subprocess.run(f"echo '{new_crontab}' | crontab -", shell=True)
+        print("Set up autostart on system boot")
+    else:
+        print("Autostart is already set up")
+
+
+def disable_autostart():
+    current_crontab = subprocess.run("crontab -l", shell=True, capture_output=True, text=True).stdout
+    new_crontab = "\n".join([line for line in current_crontab.split("\n") if CRON_MARKER not in line and STARTUP_SCRIPT not in line])
+    subprocess.run(f"echo '{new_crontab}' | crontab -", shell=True)
+    print("Disabled autostart on system boot")
+
+
+def save_pid():
+    with open(PYPM_PID_FILE, 'w') as f:
+        f.write(str(os.getpid()))
+
+
+def get_saved_pid():
+    if PYPM_PID_FILE.exists():
+        with open(PYPM_PID_FILE, 'r') as f:
+            return int(f.read().strip())
+    return None
+
+
+def stop_self():
+    pid = get_saved_pid()
+    if pid and psutil.pid_exists(pid):
+        try:
+            parent = psutil.Process(pid)
+            parent.terminate()
+            print(f"PyPM (PID: {pid}) has been stopped.")
+        except psutil.NoSuchProcess:
+            print("PyPM process not found.")
+    else:
+        print("No running PyPM process found.")
+    if PYPM_PID_FILE.exists():
+        PYPM_PID_FILE.unlink()
+    sys.exit(0)
+
+
+def restart_self():
+    stop_self()
+    time.sleep(1)  # Give the process time to terminate
+    start_self()
+
+
+def start_self():
+    pypm_path = Path(sys.executable).parent / 'pypm'
+    if pypm_path.exists():
+        subprocess.Popen([str(pypm_path)], start_new_session=True)
+        print("PyPM has been started.")
+    else:
+        print("PyPM executable not found. Please ensure it's installed correctly.")
+
 
 def main():
+    save_pid()  # Save the PID when PyPM starts
     config = load_config()
 
     if len(sys.argv) < 2:
-        print("Usage: pypm [list|start|stop|restart|delete|save|startup]")
+        print("Usage: pypm [list|start|stop|restart|delete|save|startup|disable-startup|stop-self|restart-self|start-self]")
         return
 
     action = sys.argv[1]
@@ -95,7 +185,7 @@ def main():
         list_processes(config)
     elif action == 'start':
         if len(sys.argv) < 3:
-            print("Usage: python process_manager.py start <name> [command]")
+            print("Usage: pypm start <name> [command]")
             return
         name = sys.argv[2]
         if name in config:
@@ -110,7 +200,7 @@ def main():
         print(f"Started {name} with PID {pid}")
     elif action in ['stop', 'delete']:
         if len(sys.argv) < 3:
-            print(f"Usage: python process_manager.py {action} <name|all>")
+            print(f"Usage: pypm {action} <name|all>")
             return
         target = sys.argv[2]
         if target == 'all':
@@ -135,7 +225,7 @@ def main():
         save_config(config)
     elif action == 'restart':
         if len(sys.argv) < 3:
-            print(f"Usage: python process_manager.py {action} <name|all>")
+            print(f"Usage: pypm {action} <name|all>")
             return
         target = sys.argv[2]
         if target == 'all':
@@ -162,9 +252,21 @@ def main():
         print("Saved current process list for autostart")
     elif action == 'startup':
         setup_autostart()
-        print("Set up autostart on system boot")
+    elif action == 'disable-startup':
+        disable_autostart()
+    elif action == 'stop-self':
+        stop_self()
+    elif action == 'restart-self':
+        restart_self()
+    elif action == 'start-self':
+        start_self()
+    elif action == 'enable':
+        enable_pypm_autostart()
+    elif action == 'disable':
+        disable_pypm_autostart()
     else:
-        print("Unknown action. Use list, start, stop, restart, delete, save, or startup.")
+        print("Unknown action. Use list, start, stop, restart, delete, save, startup, disable-startup, stop-self, restart-self, start-self, enable, or disable.")
+
 
 if __name__ == "__main__":
     main()
