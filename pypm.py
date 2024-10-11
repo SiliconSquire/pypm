@@ -107,39 +107,31 @@ def main():
         config[name] = {'command': command, 'pid': pid, 'directory': directory}
         save_config(config)
         print(f"Started {name} with PID {pid}")
-    elif action in ['stop', 'restart', 'delete']:
-        if len(sys.argv) < 3:
-            print(f"Usage: python process_manager.py {action} <name|all>")
-            return
-        target = sys.argv[2]
-        if target == 'all':
-            for name in list(config.keys()):
-                stop_process(config[name]['pid'])
-                if action == 'restart':
-                    pid = start_process(name, config[name]['directory'], config[name]['command'])
-                    config[name]['pid'] = pid
-                    print(f"Restarted {name} with PID {pid}")
-                elif action == 'delete':
-                    del config[name]
-                    print(f"Deleted {name}")
-                else:
-                    config[name]['pid'] = None
-                    print(f"Stopped {name}")
-        elif target in config:
-            stop_process(config[target]['pid'])
-            if action == 'restart':
-                pid = start_process(target, config[target]['directory'], config[target]['command'])
-                config[target]['pid'] = pid
-                print(f"Restarted {target} with PID {pid}")
-            elif action == 'delete':
-                del config[target]
-                print(f"Deleted {target}")
+elif action in ['stop', 'delete']:
+    if len(sys.argv) < 3:
+        print(f"Usage: python process_manager.py {action} <name|all>")
+        return
+    target = sys.argv[2]
+    if target == 'all':
+        for name in list(config.keys()):
+            stop_process(config[name]['pid'])
+            if action == 'delete':
+                del config[name]
+                print(f"Deleted {name}")
             else:
-                config[target]['pid'] = None
-                print(f"Stopped {target}")
+                config[name]['pid'] = None
+                print(f"Stopped {name}")
+    elif target in config:
+        stop_process(config[target]['pid'])
+        if action == 'delete':
+            del config[target]
+            print(f"Deleted {target}")
         else:
-            print(f"Process {target} not found")
-        save_config(config)
+            config[target]['pid'] = None
+            print(f"Stopped {target}")
+    else:
+        print(f"Process {target} not found")
+    save_config(config)
     elif action == 'save':
         for name, process in config.items():
             process['autostart'] = True
