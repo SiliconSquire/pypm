@@ -29,59 +29,59 @@ After installation, the specified user can use PyPM with the following commands:
    ```
    pypm start <process_name> "<command>"
    ```
-   Example: `pypm start myapp "python3 app.py"`
+   Example: `pypm start myapp "python3 app.py"` (py script must be in the same folder as the venv)
 
-2. List all managed processes:
+3. List all managed processes:
    ```
    pypm list
    ```
 
-3. Stop a process:
+4. Stop a process:
    ```
    pypm stop <process_name>
    ```
 
-4. Restart a process:
+5. Restart a process:
    ```
    pypm restart <process_name>
    ```
 
-5. Delete a process from PyPM management:
+6. Delete a process from PyPM management:
    ```
    pypm delete <process_name>
    ```
 
-6. Save current processes for autostart:
+7. Save current processes for autostart:
    ```
    pypm save
    ```
 
-7. Set up autostart for managed processes on system boot:
+8. Set up autostart for managed processes on system boot:
    ```
    pypm startup
    ```
 
-8. Disable autostart for managed processes:
+9. Disable autostart for managed processes:
    ```
    pypm disable-startup
    ```
 
-9. Stop PyPM itself:
+10. Stop PyPM itself:
    ```
    pypm stop-self
    ```
 
-10. Restart PyPM:
+11. Restart PyPM:
     ```
     pypm restart-self
     ```
 
-11. Enable PyPM autostart (already done during installation):
+12. Enable PyPM autostart (already done during installation):
     ```
     pypm enable
     ```
 
-12. Disable PyPM autostart:
+13. Disable PyPM autostart:
     ```
     pypm disable
     ```
