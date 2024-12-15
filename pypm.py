@@ -6,6 +6,7 @@ import signal
 import psutil
 import time
 from pathlib import Path
+import threading
 
 CONFIG_FILE = Path.home() / '.pypm_config.json'
 STARTUP_SCRIPT = Path.home() / '.pypm_startup.sh'
@@ -85,9 +86,52 @@ def start_process(name, directory, command):
     else:
         full_command = f"cd {directory} && {command}"
     
+    # Start the process in a new session
     process = subprocess.Popen(full_command, shell=True, executable='/bin/bash', start_new_session=True,
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    # Start a monitor thread for this process
+    monitor_thread = threading.Thread(target=monitor_and_restart, args=(name, directory, command, process.pid), daemon=True)
+    monitor_thread.start()
+    
     return process.pid
+
+
+def monitor_and_restart(name, directory, command, pid):
+    max_restarts = 5
+    restart_count = 0
+    restart_delay = 3  # seconds
+
+    while restart_count < max_restarts:
+        try:
+            # Wait for process to exit
+            process = psutil.Process(pid)
+            process.wait()
+            
+            # If process exited, restart it
+            print(f"Process {name} (PID: {pid}) exited, restarting...")
+            time.sleep(restart_delay)
+            
+            # Start the process again
+            new_pid = start_process(name, directory, command)
+            
+            # Update the config with new PID
+            config = load_config()
+            if name in config:
+                config[name]['pid'] = new_pid
+                save_config(config)
+            
+            restart_count += 1
+            pid = new_pid
+            
+        except psutil.NoSuchProcess:
+            break
+        except Exception as e:
+            print(f"Error monitoring process {name}: {e}")
+            break
+
+    if restart_count >= max_restarts:
+        print(f"Process {name} failed to stay running after {max_restarts} restarts. Giving up.")
 
 
 def stop_process(pid):
