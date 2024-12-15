@@ -36,14 +36,9 @@ if ! python3 -m venv "$PYPM_DIR/venv"; then
 fi
 
 # Activate virtual environment and install psutil
-if ! su - $USERNAME << EOF
-source $PYPM_DIR/venv/bin/activate
-pip install psutil
+su - $USERNAME << 'EOF'
+bash -c 'source $PYPM_DIR/venv/bin/activate && pip install --no-cache-dir psutil'
 EOF
-then
-    echo "Failed to install dependencies"
-    exit 1
-fi
 
 # Download PyPM script
 if ! wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/pypm.py -O "$PYPM_DIR/pypm.py"; then
@@ -60,6 +55,12 @@ python $PYPM_DIR/pypm.py "\$@"
 EOF
 
 chmod +x "$LOCAL_BIN_DIR/pypm"
+
+# Create .bashrc if it doesn't exist
+if [ ! -f "$USER_HOME/.bashrc" ]; then
+    touch "$USER_HOME/.bashrc"
+    chown $USERNAME:$USERNAME "$USER_HOME/.bashrc"
+fi
 
 # Add to PATH if not already there
 if ! grep -q "$LOCAL_BIN_DIR" "$USER_HOME/.bashrc"; then
