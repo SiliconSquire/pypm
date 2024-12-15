@@ -29,16 +29,10 @@ LOCAL_BIN_DIR="$USER_HOME/.local/bin"
 mkdir -p "$PYPM_DIR"
 mkdir -p "$LOCAL_BIN_DIR"
 
-# Create virtual environment
-if ! python3 -m venv "$PYPM_DIR/venv"; then
-    echo "Failed to create virtual environment"
-    exit 1
-fi
-
-# Activate virtual environment and install psutil
-su - $USERNAME << 'EOF'
-$PYPM_DIR/venv/bin/pip install psutil
-EOF
+# Create virtual environment and install dependencies
+python3 -m venv "$PYPM_DIR/venv"
+chown -R $USERNAME:$USERNAME "$PYPM_DIR"
+su - $USERNAME -c "$PYPM_DIR/venv/bin/pip install --user psutil"
 
 # Download PyPM script
 if ! wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/pypm.py -O "$PYPM_DIR/pypm.py"; then
