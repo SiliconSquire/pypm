@@ -18,6 +18,7 @@ if ! id "$USERNAME" &>/dev/null; then
 fi
 
 # Install system dependencies
+command -v wget >/dev/null 2>&1 || { echo "wget is required but not installed. Installing wget..."; apt install -y wget; }
 apt update
 apt install -y python3-pip python3-venv
 
@@ -29,16 +30,26 @@ mkdir -p "$PYPM_DIR"
 mkdir -p "$LOCAL_BIN_DIR"
 
 # Create virtual environment
-python3 -m venv "$PYPM_DIR/venv"
+if ! python3 -m venv "$PYPM_DIR/venv"; then
+    echo "Failed to create virtual environment"
+    exit 1
+fi
 
 # Activate virtual environment and install psutil
-su - $USERNAME << EOF
+if ! su - $USERNAME << EOF
 source $PYPM_DIR/venv/bin/activate
-pip install psutil tabulate colorama
+pip install psutil
 EOF
+then
+    echo "Failed to install dependencies"
+    exit 1
+fi
 
 # Download PyPM script
-wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/pypm.py -O "$PYPM_DIR/pypm.py"
+if ! wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/pypm.py -O "$PYPM_DIR/pypm.py"; then
+    echo "Failed to download PyPM script"
+    exit 1
+fi
 chmod +x "$PYPM_DIR/pypm.py"
 
 # Create wrapper script
@@ -59,10 +70,7 @@ fi
 chown -R $USERNAME:$USERNAME "$PYPM_DIR"
 chown -R $USERNAME:$USERNAME "$LOCAL_BIN_DIR"
 
-# Enable PyPM autostart
-su - $USERNAME -c "$LOCAL_BIN_DIR/pypm enable"
-
-echo "PyPM has been installed for user $USERNAME and enabled for autostart."
+echo "PyPM has been installed for user $USERNAME."
 echo "Please ask $USERNAME to log out and log back in, or run 'source ~/.bashrc' to update their PATH."
 echo "They can then use PyPM by simply typing 'pypm' followed by commands."
 
@@ -89,23 +97,8 @@ Usage Guide for PyPM:
 6. Save current processes for autostart:
    pypm save
 
-7. Set up autostart for managed processes:
+7. Set up autostart on system boot:
    pypm startup
-
-8. Disable autostart for managed processes:
-   pypm disable-startup
-
-9. Stop PyPM itself:
-   pypm stop-self
-
-10. Restart PyPM:
-    pypm restart-self
-
-11. Enable PyPM autostart (already done during installation):
-    pypm enable
-
-12. Disable PyPM autostart:
-    pypm disable
 
 For more information, run 'pypm' without any arguments.
 EOF
