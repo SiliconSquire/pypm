@@ -50,8 +50,7 @@ chmod +x "$PYPM_DIR/pypm.py"
 # Create wrapper script
 cat > "$LOCAL_BIN_DIR/pypm" << EOF
 #!/bin/bash
-source $PYPM_DIR/venv/bin/activate
-python $PYPM_DIR/pypm.py "\$@"
+$PYPM_DIR/venv/bin/python $PYPM_DIR/pypm.py "\$@"
 EOF
 
 chmod +x "$LOCAL_BIN_DIR/pypm"
