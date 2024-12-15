@@ -31,16 +31,24 @@ mkdir -p "$LOCAL_BIN_DIR"
 # Create virtual environment
 python3 -m venv "$PYPM_DIR/venv"
 
-# Activate virtual environment and install psutil
-# Try the original way first
-if ! su - $USERNAME << EOF
+# Try multiple methods to install psutil
+echo "Attempting to install psutil..."
+
+# Method 1: Original way
+if su - $USERNAME << EOF
 source $PYPM_DIR/venv/bin/activate
 pip install psutil
 EOF
 then
-    # If the original way fails, try the alternative method
-    echo "First method failed, trying alternative method..."
-    su - $USERNAME -c "bash -c '. $PYPM_DIR/venv/bin/activate && $PYPM_DIR/venv/bin/pip install psutil'"
+    echo "Method 1 succeeded!"
+elif su - $USERNAME -c "bash -c '. $PYPM_DIR/venv/bin/activate && $PYPM_DIR/venv/bin/pip install psutil'"
+then
+    echo "Method 2 succeeded!"
+elif apt-get install -y python3-psutil
+then
+    echo "Method 3 succeeded (installed system package)!"
+else
+    echo "Warning: Failed to install psutil. PyPM may have limited functionality."
 fi
 
 # Download PyPM script
