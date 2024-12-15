@@ -47,13 +47,18 @@ def save_config(config):
 
 
 def list_processes(config):
+    if not config:
+        print("No processes are currently being managed by PyPM")
+        return
+        
     for name, process in config.items():
-        if psutil.pid_exists(process['pid']):
-            p = psutil.Process(process['pid'])
+        pid = process.get('pid')
+        if pid is not None and psutil.pid_exists(pid):
+            p = psutil.Process(pid)
             status = "RUNNING" if p.is_running() else "STOPPED"
             cpu = p.cpu_percent()
             memory = p.memory_info().rss / 1024 / 1024  # Convert to MB
-            print(f"{name:<20} {status:<10} PID: {process['pid']:<6} CPU: {cpu:.1f}% MEM: {memory:.1f}MB")
+            print(f"{name:<20} {status:<10} PID: {pid:<6} CPU: {cpu:.1f}% MEM: {memory:.1f}MB")
         else:
             print(f"{name:<20} STOPPED    PID: N/A")
 
