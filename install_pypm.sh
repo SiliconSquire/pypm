@@ -18,7 +18,6 @@ if ! id "$USERNAME" &>/dev/null; then
 fi
 
 # Install system dependencies
-command -v wget >/dev/null 2>&1 || { echo "wget is required but not installed. Installing wget..."; apt install -y wget; }
 apt update
 apt install -y python3-pip python3-venv
 
@@ -29,31 +28,27 @@ LOCAL_BIN_DIR="$USER_HOME/.local/bin"
 mkdir -p "$PYPM_DIR"
 mkdir -p "$LOCAL_BIN_DIR"
 
-# Create virtual environment and install dependencies
+# Create virtual environment
 python3 -m venv "$PYPM_DIR/venv"
-chown -R $USERNAME:$USERNAME "$PYPM_DIR"
-su - $USERNAME -c "$PYPM_DIR/venv/bin/pip install --user psutil"
+
+# Activate virtual environment and install psutil
+su - $USERNAME << EOF
+source $PYPM_DIR/venv/bin/activate
+pip install psutil
+EOF
 
 # Download PyPM script
-if ! wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/pypm.py -O "$PYPM_DIR/pypm.py"; then
-    echo "Failed to download PyPM script"
-    exit 1
-fi
+wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/pypm.py -O "$PYPM_DIR/pypm.py"
 chmod +x "$PYPM_DIR/pypm.py"
 
 # Create wrapper script
 cat > "$LOCAL_BIN_DIR/pypm" << EOF
 #!/bin/bash
-$PYPM_DIR/venv/bin/python $PYPM_DIR/pypm.py "\$@"
+source $PYPM_DIR/venv/bin/activate
+python $PYPM_DIR/pypm.py "\$@"
 EOF
 
 chmod +x "$LOCAL_BIN_DIR/pypm"
-
-# Create .bashrc if it doesn't exist
-if [ ! -f "$USER_HOME/.bashrc" ]; then
-    touch "$USER_HOME/.bashrc"
-    chown $USERNAME:$USERNAME "$USER_HOME/.bashrc"
-fi
 
 # Add to PATH if not already there
 if ! grep -q "$LOCAL_BIN_DIR" "$USER_HOME/.bashrc"; then
