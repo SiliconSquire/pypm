@@ -32,10 +32,16 @@ mkdir -p "$LOCAL_BIN_DIR"
 python3 -m venv "$PYPM_DIR/venv"
 
 # Activate virtual environment and install psutil
-su - $USERNAME << EOF
+# Try the original way first
+if ! su - $USERNAME << EOF
 source $PYPM_DIR/venv/bin/activate
 pip install psutil
 EOF
+then
+    # If the original way fails, try the alternative method
+    echo "First method failed, trying alternative method..."
+    su - $USERNAME -c "bash -c '. $PYPM_DIR/venv/bin/activate && $PYPM_DIR/venv/bin/pip install psutil'"
+fi
 
 # Download PyPM script
 wget https://raw.githubusercontent.com/SiliconSquire/pypm/main/pypm.py -O "$PYPM_DIR/pypm.py"
