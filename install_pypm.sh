@@ -37,7 +37,7 @@ fi
 
 # Activate virtual environment and install psutil
 su - $USERNAME << 'EOF'
-bash -c 'source $PYPM_DIR/venv/bin/activate && pip install --no-cache-dir psutil'
+$PYPM_DIR/venv/bin/pip install psutil
 EOF
 
 # Download PyPM script
